@@ -45,3 +45,22 @@ class ReviewRequest(BaseModel):
     is_confirmed: bool
     comments: Optional[str] = None
     modified_text: Optional[str] = None
+
+class FeedbackRequest(BaseModel):
+    user_id: str
+    rating: int
+    comment: Optional[str] = None
+
+class FeedbackResponse(BaseModel):
+    id: int
+    translation_id: int
+    user_id: str
+    rating: int
+    comment: Optional[str]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class TranslationWithFeedback(TranslationResponse):
+    feedbacks: List[FeedbackResponse] = []

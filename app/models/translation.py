@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.core.database import Base
 
@@ -18,3 +19,5 @@ class Translation(Base):
     reviewer_comments = Column(String, nullable=True)
     human_modified = Column(Boolean, default=False)
     machine_translation = Column(String)
+    
+    feedbacks = relationship("TranslationFeedback", back_populates="translation")

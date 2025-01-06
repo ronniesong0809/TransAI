@@ -10,7 +10,10 @@ from app.schemas.translation import (
     QualityCheckRequest,
     BatchTranslationRequest,
     BatchTranslationResponse,
-    ReviewRequest
+    ReviewRequest,
+    FeedbackRequest,
+    FeedbackResponse,
+    TranslationWithFeedback
 )
 from datetime import datetime
 
@@ -202,3 +205,90 @@ def review_translation(
         human_modified=translation.human_modified,
         machine_translation=translation.machine_translation or translation.target_text
     ) 
+
+@router.post("/translations/{translation_id}/feedback", response_model=FeedbackResponse)
+def create_feedback(
+    translation_id: int,
+    request: FeedbackRequest,
+    db: Session = Depends(get_db)
+):
+    translation = db.query(Translation).filter(Translation.id == translation_id).first()
+    if not translation:
+        raise HTTPException(status_code=404, detail="Translation not found")
+    
+    if not 1 <= request.rating <= 5:
+        raise HTTPException(status_code=400, detail="Rating must be between 1 and 5")
+    
+    feedback = TranslationFeedback(
+        translation_id=translation_id,
+        user_id=request.user_id,
+        rating=request.rating,
+        comment=request.comment
+    )
+    
+    db.add(feedback)
+    db.commit()
+    db.refresh(feedback)
+    
+    return feedback
+
+@router.get("/translations/{translation_id}/feedback", response_model=List[FeedbackResponse])
+def get_translation_feedback(
+    translation_id: int,
+    db: Session = Depends(get_db)
+):
+    translation = db.query(Translation).filter(Translation.id == translation_id).first()
+    if not translation:
+        raise HTTPException(status_code=404, detail="Translation not found")
+    
+    return translation.feedbacks
+
+@router.get("/translations/{translation_id}/with-feedback", response_model=TranslationWithFeedback)
+def get_translation_with_feedback(
+    translation_id: int,
+    db: Session = Depends(get_db)
+):
+    translation = db.query(Translation).filter(Translation.id == translation_id).first()
+    if not translation:
+        raise HTTPException(status_code=404, detail="Translation not found")
+    
+    return TranslationWithFeedback(
+        source_text=translation.source_text,
+        target_text=translation.target_text,
+        source_lang=translation.source_lang,
+        target_lang=translation.target_lang,
+        quality_score=translation.quality_score,
+        created_at=translation.created_at,
+        modified_at=translation.modified_at,
+        from_cache=True,
+        is_confirmed=translation.is_confirmed,
+        last_modified_by=translation.last_modified_by,
+        reviewer_comments=translation.reviewer_comments,
+        human_modified=translation.human_modified,
+        machine_translation=translation.machine_translation,
+        feedbacks=translation.feedbacks
+    )
+
+@router.get("/translations/feedback/stats")
+def get_feedback_stats(db: Session = Depends(get_db)):
+    feedbacks = db.query(TranslationFeedback).all()
+    
+    if not feedbacks:
+        return {
+            "total_feedbacks": 0,
+            "average_rating": 0,
+            "rating_distribution": {str(i): 0 for i in range(1, 6)}
+        }
+    
+    total = len(feedbacks)
+    avg_rating = sum(f.rating for f in feedbacks) / total
+    distribution = {str(i): 0 for i in range(1, 6)}
+    
+    for feedback in feedbacks:
+        distribution[str(feedback.rating)] += 1
+    
+    return {
+        "total_feedbacks": total,
+        "average_rating": round(avg_rating, 2),
+        "rating_distribution": distribution
+    } 
