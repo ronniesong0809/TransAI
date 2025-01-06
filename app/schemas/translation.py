@@ -16,6 +16,9 @@ class TranslationResponse(BaseModel):
     created_at: datetime
     from_cache: bool
 
+    class Config:
+        from_attributes = True
+
 class QualityCheckRequest(BaseModel):
     translation_id: int
     reviewer_comments: Optional[str] = None 

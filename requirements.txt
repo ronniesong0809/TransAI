@@ -3,4 +3,5 @@ uvicorn
 sqlalchemy
 openai
 python-dotenv
-pydantic 
+pydantic
+pydantic-settings 

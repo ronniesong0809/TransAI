@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Float, DateTime
 from sqlalchemy.sql import func
-from database import Base
+from app.core.database import Base
 
 class Translation(Base):
     __tablename__ = "translations"
