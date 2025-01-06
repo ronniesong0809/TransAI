@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from app.core.database import Base
+from core.database import Base
 
 class TranslationFeedback(Base):
     __tablename__ = "translation_feedbacks"

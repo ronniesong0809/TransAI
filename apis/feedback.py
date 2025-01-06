@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
-from app.core.database import get_db
-from app.models.translation import Translation
-from app.models.feedback import TranslationFeedback
-from app.schemas.feedback import FeedbackRequest, FeedbackResponse, FeedbackStats
+from core.database import get_db
+from models.translation import Translation
+from models.feedback import TranslationFeedback
+from schemas.feedback import FeedbackRequest, FeedbackResponse, FeedbackStats
 
 router = APIRouter()
 

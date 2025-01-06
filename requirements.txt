@@ -4,4 +4,10 @@ sqlalchemy
 openai
 python-dotenv
 pydantic
-pydantic-settings 
+pydantic-settings
+python-jose[cryptography]
+passlib[bcrypt]
+alembic
+psycopg2-binary
+pytest
+httpx 

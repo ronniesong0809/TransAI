@@ -3,9 +3,9 @@ from sqlalchemy import func, distinct, case
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from typing import List, Optional
-from app.core.database import get_db
-from app.models.translation import Translation
-from app.schemas.analytics import (
+from core.database import get_db
+from models.translation import Translation
+from schemas.analytics import (
     TranslationAnalytics,
     LanguagePairStats,
     TimeSeriesPoint,
@@ -48,7 +48,10 @@ def get_translation_analytics(
         Translation.target_lang,
         func.count().label('count'),
         func.avg(Translation.quality_score).label('avg_quality'),
-        func.sum(case([(Translation.human_modified == True, 1)], else_=0)).label('human_modified_count')
+        func.sum(case(
+            (Translation.human_modified == True, 1),
+            else_=0
+        )).label('human_modified_count')
     ).group_by(
         Translation.source_lang,
         Translation.target_lang
@@ -56,11 +59,26 @@ def get_translation_analytics(
     
     # Calculate quality distribution
     quality_dist = db.query(
-        func.sum(case([(Translation.quality_score < 0.2, 1)], else_=0)).label('range_0_20'),
-        func.sum(case([(Translation.quality_score >= 0.2, 1), (Translation.quality_score < 0.4, 1)], else_=0)).label('range_20_40'),
-        func.sum(case([(Translation.quality_score >= 0.4, 1), (Translation.quality_score < 0.6, 1)], else_=0)).label('range_40_60'),
-        func.sum(case([(Translation.quality_score >= 0.6, 1), (Translation.quality_score < 0.8, 1)], else_=0)).label('range_60_80'),
-        func.sum(case([(Translation.quality_score >= 0.8, 1)], else_=0)).label('range_80_100')
+        func.sum(case(
+            (Translation.quality_score < 0.2, 1),
+            else_=0
+        )).label('range_0_20'),
+        func.sum(case(
+            (Translation.quality_score.between(0.2, 0.4), 1),
+            else_=0
+        )).label('range_20_40'),
+        func.sum(case(
+            (Translation.quality_score.between(0.4, 0.6), 1),
+            else_=0
+        )).label('range_40_60'),
+        func.sum(case(
+            (Translation.quality_score.between(0.6, 0.8), 1),
+            else_=0
+        )).label('range_60_80'),
+        func.sum(case(
+            (Translation.quality_score >= 0.8, 1),
+            else_=0
+        )).label('range_80_100')
     ).filter(Translation.quality_score.isnot(None)).first()
     
     # Calculate daily stats
