@@ -21,6 +21,11 @@ class TranslationResponse(BaseModel):
     created_at: datetime
     modified_at: datetime
     from_cache: bool
+    is_confirmed: bool
+    last_modified_by: Optional[str] = None
+    reviewer_comments: Optional[str] = None
+    human_modified: bool
+    machine_translation: str
 
     class Config:
         from_attributes = True
@@ -32,4 +37,11 @@ class BatchTranslationResponse(BaseModel):
 
 class QualityCheckRequest(BaseModel):
     translation_id: int
-    reviewer_comments: Optional[str] = None 
+    reviewer_comments: Optional[str] = None
+
+class ReviewRequest(BaseModel):
+    translation_id: int
+    reviewer: str
+    is_confirmed: bool
+    comments: Optional[str] = None
+    modified_text: Optional[str] = None

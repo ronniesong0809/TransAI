@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime
+from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean
 from sqlalchemy.sql import func
 from app.core.database import Base
 
@@ -12,4 +12,9 @@ class Translation(Base):
     target_lang = Column(String)
     quality_score = Column(Float, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    modified_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now()) 
+    modified_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    is_confirmed = Column(Boolean, default=False)
+    last_modified_by = Column(String, nullable=True)
+    reviewer_comments = Column(String, nullable=True)
+    human_modified = Column(Boolean, default=False)
+    machine_translation = Column(String)

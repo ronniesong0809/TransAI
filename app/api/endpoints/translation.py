@@ -9,7 +9,8 @@ from app.schemas.translation import (
     TranslationResponse, 
     QualityCheckRequest,
     BatchTranslationRequest,
-    BatchTranslationResponse
+    BatchTranslationResponse,
+    ReviewRequest
 )
 from datetime import datetime
 
@@ -32,7 +33,12 @@ def translate(request: TranslationRequest, db: Session = Depends(get_db)):
             quality_score=cached_translation.quality_score,
             created_at=cached_translation.created_at,
             modified_at=cached_translation.modified_at,
-            from_cache=True
+            from_cache=True,
+            is_confirmed=cached_translation.is_confirmed,
+            last_modified_by=cached_translation.last_modified_by,
+            reviewer_comments=cached_translation.reviewer_comments,
+            human_modified=cached_translation.human_modified,
+            machine_translation=cached_translation.machine_translation or cached_translation.target_text
         )
     
     translated_text = translate_text(
@@ -56,7 +62,8 @@ def translate(request: TranslationRequest, db: Session = Depends(get_db)):
         target_lang=request.target_lang,
         quality_score=quality_score,
         created_at=now,
-        modified_at=now
+        modified_at=now,
+        machine_translation=translated_text
     )
     db.add(db_translation)
     db.commit()
@@ -70,7 +77,12 @@ def translate(request: TranslationRequest, db: Session = Depends(get_db)):
         quality_score=db_translation.quality_score,
         created_at=db_translation.created_at,
         modified_at=db_translation.modified_at,
-        from_cache=False
+        from_cache=False,
+        is_confirmed=db_translation.is_confirmed,
+        last_modified_by=db_translation.last_modified_by,
+        reviewer_comments=db_translation.reviewer_comments,
+        human_modified=db_translation.human_modified,
+        machine_translation=db_translation.machine_translation
     )
 
 @router.post("/translate/batch/", response_model=BatchTranslationResponse)
@@ -79,7 +91,6 @@ async def batch_translate(request: BatchTranslationRequest, db: Session = Depend
     cache_hits = 0
     
     for text in request.texts:
-        # Check cache first
         cached_translation = db.query(Translation).filter(
             Translation.source_text == text,
             Translation.source_lang == request.source_lang,
@@ -100,7 +111,6 @@ async def batch_translate(request: BatchTranslationRequest, db: Session = Depend
             ))
             continue
         
-        # Translate new text
         translated_text = translate_text(
             text,
             request.source_lang,
@@ -145,41 +155,50 @@ async def batch_translate(request: BatchTranslationRequest, db: Session = Depend
         cache_hits=cache_hits
     )
 
-@router.get("/translations/", response_model=List[TranslationResponse])
-def list_translations(db: Session = Depends(get_db)):
-    translations = db.query(Translation).all()
-    return [
-        TranslationResponse(
-            source_text=t.source_text,
-            target_text=t.target_text,
-            source_lang=t.source_lang,
-            target_lang=t.target_lang,
-            quality_score=t.quality_score,
-            created_at=t.created_at,
-            modified_at=t.modified_at,
-            from_cache=True
-        ) for t in translations
-    ]
-
-@router.post("/quality-check/{translation_id}")
-def check_translation_quality(
+@router.post("/translations/{translation_id}/review", response_model=TranslationResponse)
+def review_translation(
     translation_id: int,
-    request: QualityCheckRequest,
+    request: ReviewRequest,
     db: Session = Depends(get_db)
 ):
     translation = db.query(Translation).filter(Translation.id == translation_id).first()
     if not translation:
         raise HTTPException(status_code=404, detail="Translation not found")
     
-    quality_score = evaluate_translation_quality(
-        translation.source_text,
-        translation.target_text,
-        translation.source_lang,
-        translation.target_lang
-    )
+    translation.is_confirmed = request.is_confirmed
+    translation.last_modified_by = request.reviewer
+    translation.reviewer_comments = request.comments
     
-    translation.quality_score = quality_score
+    if request.modified_text:
+        translation.human_modified = True
+        if not translation.machine_translation:
+            translation.machine_translation = translation.target_text
+        translation.target_text = request.modified_text
+        
+        quality_score = evaluate_translation_quality(
+            translation.source_text,
+            request.modified_text,
+            translation.source_lang,
+            translation.target_lang
+        )
+        translation.quality_score = quality_score
+    
     translation.modified_at = datetime.utcnow()
     db.commit()
+    db.refresh(translation)
     
-    return {"translation_id": translation_id, "quality_score": quality_score} 
+    return TranslationResponse(
+        source_text=translation.source_text,
+        target_text=translation.target_text,
+        source_lang=translation.source_lang,
+        target_lang=translation.target_lang,
+        quality_score=translation.quality_score,
+        created_at=translation.created_at,
+        modified_at=translation.modified_at,
+        from_cache=True,
+        is_confirmed=translation.is_confirmed,
+        last_modified_by=translation.last_modified_by,
+        reviewer_comments=translation.reviewer_comments,
+        human_modified=translation.human_modified,
+        machine_translation=translation.machine_translation or translation.target_text
+    ) 
