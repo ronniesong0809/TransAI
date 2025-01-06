@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, distinct, case
+from sqlalchemy import func, distinct, case, text
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from typing import List, Optional
@@ -57,7 +57,6 @@ def get_translation_analytics(
         Translation.target_lang
     ).order_by(func.count().desc()).limit(5).all()
     
-    # Calculate quality distribution
     quality_dist = db.query(
         func.sum(case(
             (Translation.quality_score < 0.2, 1),
@@ -80,17 +79,20 @@ def get_translation_analytics(
             else_=0
         )).label('range_80_100')
     ).filter(Translation.quality_score.isnot(None)).first()
-    
-    # Calculate daily stats
+
+    if db.bind.dialect.name == 'postgresql':
+        date_func = func.date_trunc('day', Translation.created_at)
+    else:
+        date_func = func.date(Translation.created_at)
+
     daily_stats = db.query(
-        func.date_trunc('day', Translation.created_at).label('date'),
+        date_func.label('date'),
         func.count().label('count'),
         func.avg(Translation.quality_score).label('avg_quality')
     ).group_by(
-        func.date_trunc('day', Translation.created_at)
-    ).order_by('date').all()
+        date_func
+    ).order_by(text('date')).all()
     
-    # Calculate cache hit rate
     total_requests = total_translations
     cache_hits = base_query.filter(Translation.human_modified == False).count()
     cache_hit_rate = (cache_hits / total_requests * 100) if total_requests > 0 else 0
